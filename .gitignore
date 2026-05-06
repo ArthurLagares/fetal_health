@@ -1,0 +1,17 @@
+# Ambiente virtual (UV)
+.venv/
+
+
+# Variáveis de ambiente (Segurança!)
+.env
+
+
+# Byte-compiled / arquivos de cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# VS Code
+.vscode/
