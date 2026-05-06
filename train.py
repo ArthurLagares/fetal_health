@@ -1,5 +1,6 @@
 # importações
 import os
+from xml.parsers.expat import model
 from dotenv import load_dotenv
 import random
 import numpy as np
@@ -19,6 +20,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 load_dotenv()
+
 def reset_seeds() -> None:
   """
   Resets the seeds to ensure reproducibility of results.
@@ -39,73 +41,88 @@ def reset_seeds() -> None:
   np.random.seed(42)
   random.seed(42)
 
-# leitura do dataset
-url = 'raw.githubusercontent.com'
-username = 'renansantosmendes'
-repository = 'lectures-cdas-2023'
-file_name = 'fetal_health_reduced.csv'
-data = pd.read_csv(f'https://{url}/{username}/{repository}/master/{file_name}')
+def read_data():
+    
+    url = 'raw.githubusercontent.com'
+    username = 'renansantosmendes'
+    repository = 'lectures-cdas-2023'
+    file_name = 'fetal_health_reduced.csv'
+    data = pd.read_csv(f'https://{url}/{username}/{repository}/master/{file_name}')
+
+    X = data.drop(["fetal_health"], axis=1)
+    y = data["fetal_health"]
+
+    return X, y
 
 
 
 
-#  3 - Preparando o dado antes de iniciar o treino do modelo
+def process_data(X, y):
+    
+    columns_names = list(X.columns)
+    scaler = preprocessing.StandardScaler()
+    X_df = scaler.fit_transform(X)
+    X_df = pd.DataFrame(X_df, columns=columns_names)
 
-X=data.drop(["fetal_health"], axis=1)
-y=data["fetal_health"]
+    reset_seeds()
+    model = Sequential()
+    model.add(InputLayer(input_shape=(X_df.shape[1], )))
+    model.add(Dense(units=10, activation='relu'))
+    model.add(Dense(units=10, activation='relu'))
+    model.add(Dense(units=3, activation='softmax'))
 
-columns_names = list(X.columns)
-scaler = preprocessing.StandardScaler()
-X_df = scaler.fit_transform(X)
-X_df = pd.DataFrame(X_df, columns=columns_names)
+     
 
-X_train, X_test, y_train, y_test = train_test_split(X_df,
-                                                    y,
-                                                    test_size=0.3,
-                                                    random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X_df,
+                                                        y,
+                                                        test_size=0.3,
+                                                        random_state=42)
 
-y_train = y_train -1
-y_test = y_test - 1
+    y_train = y_train -1
+    y_test = y_test - 1
+    return X_train, X_test, y_train, y_test
 
+    # # 4 - Criando o modelo e adicionando as camadas
+def create_model(X):
+    reset_seeds()
+    model = Sequential()
+    model.add(InputLayer(input_shape=(X.shape[1], )))
+    model.add(Dense(units=10, activation='relu'))
+    model.add(Dense(units=10, activation='relu'))
+    model.add(Dense(units=3, activation='softmax'))
 
-# # 4 - Criando o modelo e adicionando as camadas
-
-reset_seeds()
-model = Sequential()
-model.add(InputLayer(input_shape=(X_train.shape[1], )))
-model.add(Dense(units=10, activation='relu'))
-model.add(Dense(units=10, activation='relu'))
-model.add(Dense(units=3, activation='softmax'))
-
-
-# 5 - Compilando o modelo
-
+    model.compile(loss='sparse_categorical_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
+    return model
 
 
-model.compile(loss='sparse_categorical_crossentropy',
-              optimizer='adam',
-              metrics=['accuracy'])
+def configure_mlflow():
+  os.getenv('MLFLOW_TRACKING_USERNAME')
+  os.getenv('MLFLOW_TRACKING_PASSWORD')
+  mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
 
-# 6 - Configurando o mlflow
-
-os.getenv('MLFLOW_TRACKING_USERNAME')
-os.getenv('MLFLOW_TRACKING_PASSWORD')
-mlflow.set_tracking_uri(os.getenv('MLFLOW_TRACKING_URI'))
-
-mlflow.keras.autolog(log_models=True,
-                     log_input_examples=True,
-                     log_model_signatures=True)
+  mlflow.keras.autolog(log_models=True,
+                      log_input_examples=True,
+                      log_model_signatures=True)
 
 
 # # 6 - Executando o treino do modelo
+def train_model(model, X_train, y_train, is_train=True):
+  with mlflow.start_run(run_name='experiment_mlops_ead') as run:
+    model.fit(X_train,
+              y_train,
+              epochs=50,
+              validation_split=0.2,
+              verbose=3)
 
-with mlflow.start_run(run_name='experiment_mlops_ead') as run:
-  model.fit(X_train,
-            y_train,
-            epochs=50,
-            validation_split=0.2,
-            verbose=3)
 
+if __name__ == "__main__":
+    configure_mlflow()
+    X, y = read_data()
+    X_train, X_test, y_train, y_test = process_data(X, y)
+    model = create_model(X_train)
+    train_model(model, X_train, y_train)
 
 
 
